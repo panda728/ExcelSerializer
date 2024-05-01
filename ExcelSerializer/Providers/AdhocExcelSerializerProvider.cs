@@ -1,6 +1,6 @@
 ﻿using System.Collections.Concurrent;
 
-namespace ExcelSerializer.Providers;
+namespace ExcelSerializerLib.Providers;
 
 public sealed class AdhocExcelSerializerProvider : IExcelSerializerProvider
 {

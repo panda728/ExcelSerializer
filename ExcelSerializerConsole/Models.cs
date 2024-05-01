@@ -1,4 +1,4 @@
-﻿using ExcelSerializer;
+﻿using ExcelSerializerLib;
 
 namespace ExcelSerializerConsole;
 

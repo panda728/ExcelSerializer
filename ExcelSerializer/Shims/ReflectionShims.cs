@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 
-namespace ExcelSerializer;
+namespace ExcelSerializerLib;
 
 internal static class ReflectionShims
 {

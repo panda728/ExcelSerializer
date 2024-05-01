@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
 using Bogus;
-using ExcelSerializer;
+using ExcelSerializerLib;
 using ExcelSerializerConsole;
 using static Bogus.DataSets.Name;
 
@@ -67,7 +67,7 @@ var fileName = Path.Combine(Environment.CurrentDirectory, "test.xlsx");
 if (File.Exists(fileName))
     File.Delete(fileName);
 
-ExcelSerializer.ExcelSerializer.ToFile(Users, fileName, newConfig);
+ExcelSerializer.ToFile(Users, fileName, newConfig);
 
 sw.Stop();
 

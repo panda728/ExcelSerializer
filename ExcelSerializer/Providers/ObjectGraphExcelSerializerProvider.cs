@@ -1,6 +1,6 @@
-﻿using ExcelSerializer.Serializers;
+﻿using ExcelSerializerLib.Serializers;
 
-namespace ExcelSerializer.Providers;
+namespace ExcelSerializerLib.Providers;
 
 public sealed class ObjectGraphExcelSerializerProvider : IExcelSerializerProvider
 {

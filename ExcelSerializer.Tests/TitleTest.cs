@@ -1,7 +1,9 @@
-﻿using System.Runtime.Serialization;
+﻿using System.IO.Pipelines;
+using System.Runtime.Serialization;
+using System.Text;
 using FluentAssertions;
 
-namespace ExcelSerializer.Tests;
+namespace ExcelSerializerLib.Tests;
 
 public class TitleTest
 {
@@ -16,18 +18,21 @@ public class TitleTest
         var serializer = option.GetSerializer<T>();
         Assert.NotNull(serializer);
         if (serializer == null) return;
-        var writer = new ExcelSerializerWriter(option);
+        var ms = new MemoryStream();
+        var writer = PipeWriter.Create(ms);
+        var formatter = new ExcelFormatter(option);
         try
         {
-            serializer.WriteTitle(ref writer, value1, option);
-            Assert.Equal(3, writer.SharedStrings.Count);
+            serializer.WriteTitle(ref formatter ,writer, value1, option);
+            Assert.Equal(3, formatter.SharedStrings.Count);
 
-            var columnXml = writer.ToString();
-            var sharedString1 = writer.SharedStrings.First().Key;
-            var sharedString2 = writer.SharedStrings.Skip(1).First().Key;
-            var sharedString3 = writer.SharedStrings.Skip(2).First().Key;
+            writer.Complete();
+            var result = Encoding.UTF8.GetString(ms.ToArray());
+            var sharedString1 = formatter.SharedStrings.First().Key;
+            var sharedString2 = formatter.SharedStrings.Skip(1).First().Key;
+            var sharedString3 = formatter.SharedStrings.Skip(2).First().Key;
 
-            columnXml.Should().Be(titleShouldBe);
+            result.Should().Be(titleShouldBe);
             sharedString1.Should().Be(value1ShouldBe);
             sharedString2.Should().Be(value2ShouldBe);
             sharedString3.Should().Be(value3ShouldBe);
@@ -35,10 +40,6 @@ public class TitleTest
         catch
         {
             throw;
-        }
-        finally
-        {
-            writer.Dispose();
         }
     }
 
@@ -48,24 +49,23 @@ public class TitleTest
         Assert.NotNull(serializer);
         if (serializer == null) return;
 
-        var writer = new ExcelSerializerWriter(option);
+        var ms = new MemoryStream();
+        var writer = PipeWriter.Create(ms);
+        var formatter = new ExcelFormatter(option);
         try
         {
-            serializer.WriteTitle(ref writer, value, option);
-            Assert.NotEmpty(writer.SharedStrings);
-            var columnXml = writer.ToString();
-            var sharedString1 = writer.SharedStrings.First().Key;
+            serializer.WriteTitle(ref formatter, writer, value, option);
+            Assert.NotEmpty(formatter.SharedStrings);
+            var sharedString1 = formatter.SharedStrings.First().Key;
+            writer.Complete();
+            var result = Encoding.UTF8.GetString(ms.ToArray());
 
-            columnXml.Should().Be(columnXmlShouldBe);
+            result.Should().Be(columnXmlShouldBe);
             sharedString1.Should().Be(value1ShouldBe);
         }
         catch
         {
             throw;
-        }
-        finally
-        {
-            writer.Dispose();
         }
     }
 

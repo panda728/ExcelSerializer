@@ -1,4 +1,4 @@
-﻿namespace ExcelSerializer;
+﻿namespace ExcelSerializerLib;
 
 internal static class ReflectionExtensions
 {

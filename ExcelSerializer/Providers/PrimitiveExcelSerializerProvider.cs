@@ -1,4 +1,4 @@
-﻿namespace ExcelSerializer.Providers;
+﻿namespace ExcelSerializerLib.Providers;
 
 public sealed partial class PrimitiveExcelSerializerProvider : IExcelSerializerProvider
 {

@@ -1,11 +1,13 @@
 ﻿using System.Buffers;
 using System.IO.Compression;
+using System.IO.Pipelines;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Serialization;
 using System.Security;
 using System.Text;
 
-namespace ExcelSerializer;
+namespace ExcelSerializerLib;
 
 public static class ExcelSerializer
 {
@@ -103,14 +105,20 @@ public static class ExcelSerializer
         var workPathRoot = Path.Combine(options.WorkPath, Guid.NewGuid().ToString());
         if (!Directory.Exists(workPathRoot))
             Directory.CreateDirectory(workPathRoot);
+
+        var formatter = new ExcelFormatter(options);
         try
         {
-            using (var sheetStream = CreateStream(Path.Combine(workPathRoot, SHEET_XML)))
-            using (var stringsStream = CreateStream(Path.Combine(workPathRoot, STRINGS_XML)))
-            using (var writer = new ExcelSerializerWriter(options))
+            using (var sheetStream = new FileStream(Path.Combine(workPathRoot, SHEET_XML), FileMode.Create, FileAccess.Write, FileShare.None))
+            using (var stringsStream = new FileStream(Path.Combine(workPathRoot, STRINGS_XML), FileMode.Create, FileAccess.Write, FileShare.None))
             {
-                CreateSheet(rows, sheetStream, writer, options);
-                WriteSharedStrings(stringsStream, writer);
+                var sheetWriter = PipeWriter.Create(sheetStream);
+                CreateSheet(rows, formatter, sheetWriter, options);
+                sheetWriter.Complete();
+
+                var stringsWriter = PipeWriter.Create(stringsStream);
+                WriteSharedStrings(formatter, stringsWriter);
+                stringsWriter.Complete();
             }
 
             var workRelPath = Path.Combine(workPathRoot, RELS);
@@ -154,76 +162,75 @@ public static class ExcelSerializer
             fs.Write(bytes, 0, bytes.Length);
     }
 
-    static Stream CreateStream(string fileName)
-        => new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.None);
 
-    static void CreateSheet<T>(
-        IEnumerable<T> rows,
-        Stream stream,
-        ExcelSerializerWriter writer,
-        ExcelSerializerOptions options
-    )
+    static void CreateSheet<T>(IEnumerable<T> rows, ExcelFormatter formatter, IBufferWriter<byte> writer, ExcelSerializerOptions options)
     {
-        stream.Write(_sheetStart, 0, _sheetStart.Length);
+        writer.Write(_sheetStart);
 
         if (options.HasHeaderRecord)
-            stream.Write(_frozenTitleRow, 0, _frozenTitleRow.Length);
+            writer.Write(_frozenTitleRow);
 
         if (options.AutoFitColumns)
-            WriteCellWidth(rows, ref stream, ref writer, options);
+            WriteCellWidth(rows, formatter, writer, options);
 
-        stream.Write(_dataStart, 0, _dataStart.Length);
+        writer.Write(_dataStart);
+        //writer.Advance(_dataStart.Length);
 
         var serializer = options.GetSerializer<T>();
         if (serializer != null)
         {
             if (options.HasHeaderRecord)
             {
-                writer.WriteRaw(_rowStart);
-                if (options.HeaderTitles != null && options.HeaderTitles.Any())
+                writer.Write(_rowStart);
+                //writer.Advance(_rowStart.Length);
+                if (options.HeaderTitles != null && options.HeaderTitles.Length != 0)
                 {
                     foreach (var t in options.HeaderTitles)
-                        writer.Write(t);
+                        formatter.Write(t, writer);
                 }
                 else
                 {
-                    serializer.WriteTitle(ref writer, rows.First(), options);
+                    serializer.WriteTitle(ref formatter, writer, rows.First(), options);
                 }
-                writer.WriteRaw(_rowEnd);
-                writer.CopyTo(stream);
+                writer.Write(_rowEnd);
+                //writer.Advance(_rowEnd.Length);
             }
 
 #if NET5_0_OR_GREATER
             if (rows is T[] arr)
-                WriteRowsSpan(arr.AsSpan(), ref stream, ref writer, serializer, options);
+                WriteRowsSpan(arr.AsSpan(), formatter, writer, serializer, options);
             else if (rows is List<T> list)
-                WriteRowsSpan(CollectionsMarshal.AsSpan(list), ref stream, ref writer, serializer, options);
+                WriteRowsSpan(CollectionsMarshal.AsSpan(list), formatter, writer, serializer, options);
             else
-                WriteRows(rows, ref stream, ref writer, serializer, options);
+                WriteRows(rows, formatter, writer, serializer, options);
 #else
             if (rows is T[] arr)
-                WriteRowsSpan(arr.AsSpan(), ref stream, ref writer, serializer, options);
+                WriteRowsSpan(arr.AsSpan(), formatter, writer, serializer, options);
             else
-                WriteRows(rows, ref stream, ref writer, serializer, options);
+                WriteRows(rows, formatter, writer, serializer, options);
 #endif
         }
-        writer.WriteRaw(_dataEnd);
+        writer.Write(_dataEnd);
+        //writer.Advance(_dataEnd.Length);
 
         if (options.AutoFilter)
         {
-            var colName = options.HeaderTitles != null && options.HeaderTitles.Any()
+            var colName = options.HeaderTitles != null && options.HeaderTitles.Length != 0
                 ? ToColumnName(options.HeaderTitles.Length)
-                : ToColumnName(writer.ColumnMaxLength.Count);
+                : ToColumnName(formatter.ColumnMaxLength.Count);
 
             var range = $"A1:{colName}{rows.Count() + 1}";
-            writer.WriteRaw(_autoFilterStart);
-            writer.WriteRaw(Encoding.UTF8.GetBytes(range));
-            writer.WriteRaw(_autoFilterEnd);
+            writer.Write(_autoFilterStart);
+            //writer.Advance(_autoFilterStart.Length);
+            formatter.Write(range, writer);
+            writer.Write(_autoFilterEnd);
+            //writer.Advance(_autoFilterEnd.Length);
         }
 
-        writer.WriteRaw(_sheetEnd);
-        writer.CopyTo(stream);
+        writer.Write(_sheetEnd);
+        //writer.Advance(_sheetEnd.Length);
     }
+
     static string ToColumnName(int index)
     {
         if (index < 1) { return ""; }
@@ -234,7 +241,7 @@ public static class ExcelSerializer
             list.Add(Convert.ToChar(index % 26 + 65));
         }
         while ((index = index / 26 - 1) != -1);
-        var sb = new StringBuilder();
+        var sb = new StringBuilder(list.Count);
         for (int i = list.Count - 1; i >= 0; i--)
         {
             sb.Append(list[i]);
@@ -242,46 +249,31 @@ public static class ExcelSerializer
         return sb.ToString();
     }
 
-    static void WriteRowsSpan<T>(
-        Span<T> rows,
-        ref Stream stream,
-        ref ExcelSerializerWriter writer,
-        IExcelSerializer<T> serializer,
-        ExcelSerializerOptions options
-    )
+    static void WriteRowsSpan<T>(Span<T> rows, ExcelFormatter formatter, IBufferWriter<byte> writer, IExcelSerializer<T> serializer, ExcelSerializerOptions options)
     {
         foreach (var row in rows)
         {
-            writer.WriteRaw(_rowStart);
-            serializer.Serialize(ref writer, row, options);
-            writer.WriteRaw(_rowEnd);
-            writer.CopyTo(stream);
+            writer.Write(_rowStart);
+            //writer.Advance(_rowStart.Length);
+            serializer.Serialize(ref formatter, writer, row, options);
+            writer.Write(_rowEnd);
+            //writer.Advance(_rowEnd.Length);
         }
     }
 
-    static void WriteRows<T>(
-        IEnumerable<T> rows,
-        ref Stream stream,
-        ref ExcelSerializerWriter writer,
-        IExcelSerializer<T> serializer,
-        ExcelSerializerOptions options
-    )
+    static void WriteRows<T>(IEnumerable<T> rows, ExcelFormatter formatter, IBufferWriter<byte> writer, IExcelSerializer<T> serializer, ExcelSerializerOptions options)
     {
         foreach (var row in rows)
         {
-            writer.WriteRaw(_rowStart);
-            serializer.Serialize(ref writer, row, options);
-            writer.WriteRaw(_rowEnd);
-            writer.CopyTo(stream);
+            writer.Write(_rowStart);
+            //writer.Advance(_rowStart.Length);
+            serializer.Serialize(ref formatter, writer, row, options);
+            writer.Write(_rowEnd);
+            //writer.Advance(_rowEnd.Length);
         }
     }
 
-    static void WriteCellWidth<T>(
-        IEnumerable<T> rows,
-        ref Stream stream,
-        ref ExcelSerializerWriter writer,
-        ExcelSerializerOptions options
-    )
+    static void WriteCellWidth<T>(IEnumerable<T> rows, ExcelFormatter formatter, IBufferWriter<byte> writer, ExcelSerializerOptions options)
     {
         // Counting the number of characters in Writer's internal process
         // The result is stored in writer.ColumnMaxLength 
@@ -290,53 +282,49 @@ public static class ExcelSerializer
         if (options.HasHeaderRecord && options.HeaderTitles != null)
         {
             foreach (var t in options.HeaderTitles)
-                writer.Write(t);
-            writer.Clear();
+                formatter.Write(t, writer);
+            formatter.Clear();
         }
         foreach (var row in rows.Take(options.AutoFitDepth))
         {
-            serializer.Serialize(ref writer, row, options);
-            writer.Clear();
+            serializer.Serialize(ref formatter, writer, row, options);
+            formatter.Clear();
         }
-        writer.StopCountingCharLength();
+        formatter.StopCountingCharLength();
 
-        var size = 100 * writer.ColumnMaxLength.Count;
-        using var buffer = new ArrayPoolBufferWriter(size);
-        buffer.Write(_colStart);
-        foreach (var pair in writer.ColumnMaxLength)
+        //var size = 100 * formatter.ColumnMaxLength.Count;
+        writer.Write(_colStart);
+        //writer.Advance(_colStart.Length);
+        foreach (var pair in formatter.ColumnMaxLength)
         {
             var id = pair.Key + 1;
             var width = Math.Min(options.AutoFitWidhtMax, pair.Value + COLUMN_WIDTH_MARGIN);
-
-            WriteUtf8Bytes(@$"<col min=""{id}"" max =""{id}"" width =""{width:0.0}"" bestFit =""1"" customWidth =""1"" />", buffer);
+            ExcelFormatter.WriteRaw(@$"<col min=""{id}"" max =""{id}"" width =""{width:0.0}"" bestFit =""1"" customWidth =""1"" />".AsSpan(), writer);
         }
-        buffer.Write(_colEnd);
-        buffer.CopyTo(stream);
+        writer.Write(_colEnd);
     }
 
-    static void WriteSharedStrings(Stream stream, ExcelSerializerWriter writer)
+    static void WriteSharedStrings(ExcelFormatter formatter, IBufferWriter<byte> writer)
     {
-        stream.Write(_sstStart, 0, _sstStart.Length);
-        using var buffer = new ArrayPoolBufferWriter();
-        foreach (var s in writer.SharedStrings.Keys)
+        writer.Write(_sstStart);
+        foreach (var s in formatter.SharedStrings.Keys)
         {
-            buffer.Write(_siStart);
-            WriteUtf8Bytes(SecurityElement.Escape(s), buffer);
-            buffer.Write(_siEnd);
-            buffer.CopyTo(stream);
+            writer.Write(_siStart);
+            ExcelFormatter.WriteRaw(SecurityElement.Escape(s).AsSpan(), writer);
+            writer.Write(_siEnd);
         }
-        stream.Write(_sstEnd, 0, _sstEnd.Length);
+        writer.Write(_sstEnd);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static void WriteUtf8Bytes(string? s, ArrayPoolBufferWriter writer)
-    {
-        if (s == null)
-            return;
-#if NET5_0_OR_GREATER
-        Encoding.UTF8.GetBytes(s.AsSpan(), writer);
-#else
-        writer.Write(Encoding.UTF8.GetBytes(s));
-#endif
-    }
+    //    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    //    static void WriteRaw(string? s, ArrayPoolBufferWriter writer)
+    //    {
+    //        if (s == null)
+    //            return;
+    //#if NET5_0_OR_GREATER
+    //        Encoding.UTF8.GetBytes(s.AsSpan(), writer);
+    //#else
+    //        writer.Write(Encoding.UTF8.GetBytes(s));
+    //#endif
+    //    }
 }

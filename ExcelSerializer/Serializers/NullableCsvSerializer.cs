@@ -1,25 +1,27 @@
-﻿namespace ExcelSerializer.Serializers;
+﻿using System.Buffers;
+
+namespace ExcelSerializerLib.Serializers;
 
 public sealed class NullableExcelSerializer<T> : IExcelSerializer<T?>
     where T : struct
 {
-    public void WriteTitle(ref ExcelSerializerWriter writer, T? value, ExcelSerializerOptions options, string name = "value")
+    public void WriteTitle(ref ExcelFormatter formatter, IBufferWriter<byte> writer, T? value, ExcelSerializerOptions options, string name = "value")
     {
         if (value == null)
         {
-            writer.Write(name);
+            formatter.Write(name, writer);
             return;
         }
-        options.GetRequiredSerializer<T>().WriteTitle(ref writer, value.Value, options, name);
+        options.GetRequiredSerializer<T>().WriteTitle(ref formatter, writer, value.Value, options, name);
     }
 
-    public void Serialize(ref ExcelSerializerWriter writer, T? value, ExcelSerializerOptions options)
+    public void Serialize(ref ExcelFormatter formatter, IBufferWriter<byte> writer, T? value, ExcelSerializerOptions options)
     {
         if (value == null)
         {
-            writer.WriteEmpty();
+            formatter.WriteEmpty(writer);
             return;
         }
-        options.GetRequiredSerializer<T>().Serialize(ref writer, value.Value, options);
+        options.GetRequiredSerializer<T>().Serialize(ref formatter, writer, value.Value, options);
     }
 }

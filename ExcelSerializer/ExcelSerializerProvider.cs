@@ -1,8 +1,8 @@
 ﻿using System.Collections.Concurrent;
-using ExcelSerializer.Providers;
-using ExcelSerializer.Serializers;
+using ExcelSerializerLib.Providers;
+using ExcelSerializerLib.Serializers;
 
-namespace ExcelSerializer;
+namespace ExcelSerializerLib;
 
 public interface IExcelSerializerProvider
 {

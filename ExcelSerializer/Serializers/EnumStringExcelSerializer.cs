@@ -1,8 +1,9 @@
-﻿using System.Collections.Concurrent;
+﻿using System.Buffers;
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.Serialization;
 
-namespace ExcelSerializer.Serializers;
+namespace ExcelSerializerLib.Serializers;
 
 public sealed class EnumStringExcelSerializer<T> : IExcelSerializer<T>
     where T : Enum
@@ -10,13 +11,13 @@ public sealed class EnumStringExcelSerializer<T> : IExcelSerializer<T>
     static readonly ConcurrentDictionary<T, string> stringCache = new();
     static readonly Func<T, string> toStringFactory = EnumToString;
 
-    public void WriteTitle(ref ExcelSerializerWriter writer, T value, ExcelSerializerOptions options, string name = "value")
-        => writer.Write(name);
+    public void WriteTitle(ref ExcelFormatter formatter, IBufferWriter<byte> writer, T value, ExcelSerializerOptions options, string name = "value")
+        => formatter.Write(name, writer);
 
-    public void Serialize(ref ExcelSerializerWriter writer, T value, ExcelSerializerOptions options)
+    public void Serialize(ref ExcelFormatter formatter, IBufferWriter<byte> writer, T value, ExcelSerializerOptions options)
     {
         var str = stringCache.GetOrAdd(value, toStringFactory);
-        writer.Write(str);
+        formatter.Write(str, writer);
     }
 
     static string EnumToString(T value)
@@ -41,13 +42,13 @@ public sealed class EnumValueExcelSerializer<T> : IExcelSerializer<T>
     static readonly ConcurrentDictionary<T, string> stringCache = new();
     static readonly Func<T, string> toStringFactory = EnumToString;
 
-    public void WriteTitle(ref ExcelSerializerWriter writer, T value, ExcelSerializerOptions options, string name = "value")
-        => writer.Write(name);
+    public void WriteTitle(ref ExcelFormatter formatter, IBufferWriter<byte> writer, T value, ExcelSerializerOptions options, string name = "value")
+        => formatter.Write(name, writer);
 
-    public void Serialize(ref ExcelSerializerWriter writer, T value, ExcelSerializerOptions options)
+    public void Serialize(ref ExcelFormatter formatter, IBufferWriter<byte> writer, T value, ExcelSerializerOptions options)
     {
         var str = stringCache.GetOrAdd(value, toStringFactory);
-        writer.Write(str);
+        formatter.Write(str, writer);
     }
 
     static string EnumToString(T value)

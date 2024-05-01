@@ -1,4 +1,4 @@
-﻿namespace ExcelSerializer;
+﻿namespace ExcelSerializerLib;
 
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Enum, AllowMultiple = false)]
 public sealed class ExcelSerializerAttribute : Attribute

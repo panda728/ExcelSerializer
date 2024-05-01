@@ -1,4 +1,5 @@
-﻿using ExcelSerializer;
+﻿using System.Buffers;
+using ExcelSerializerLib;
 
 namespace ExcelSerializerConsole;
 
@@ -18,13 +19,13 @@ namespace ExcelSerializerConsole;
 
 public class UnixSecondsSerializer : IExcelSerializer<DateTime>
 {
-    public void WriteTitle(ref ExcelSerializerWriter writer, DateTime value, ExcelSerializerOptions options, string name = "")
+    public void WriteTitle(ref ExcelFormatter formatter, IBufferWriter<byte> writer, DateTime value, ExcelSerializerOptions options, string name = "")
     {
-        writer.Write(name);
+        formatter.Write(name, writer);
     }
 
-    public void Serialize(ref ExcelSerializerWriter writer, DateTime value, ExcelSerializerOptions options)
+    public void Serialize(ref ExcelFormatter formatter, IBufferWriter<byte> writer, DateTime value, ExcelSerializerOptions options)
     {
-        writer.WritePrimitive(((DateTimeOffset)(value)).ToUnixTimeSeconds());
+        formatter.WritePrimitive(((DateTimeOffset)(value)).ToUnixTimeSeconds(), writer);
     }
 }

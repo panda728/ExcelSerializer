@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
-namespace ExcelSerializer;
+namespace ExcelSerializerLib;
 
 public record ExcelSerializerOptions(IExcelSerializerProvider Provider)
 {
