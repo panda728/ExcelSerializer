@@ -211,7 +211,6 @@ public static class ExcelSerializer
 #endif
         }
         writer.Write(_dataEnd);
-        //writer.Advance(_dataEnd.Length);
 
         if (options.AutoFilter)
         {
@@ -221,14 +220,10 @@ public static class ExcelSerializer
 
             var range = $"A1:{colName}{rows.Count() + 1}";
             writer.Write(_autoFilterStart);
-            //writer.Advance(_autoFilterStart.Length);
             formatter.Write(range, writer);
             writer.Write(_autoFilterEnd);
-            //writer.Advance(_autoFilterEnd.Length);
         }
-
         writer.Write(_sheetEnd);
-        //writer.Advance(_sheetEnd.Length);
     }
 
     static string ToColumnName(int index)
@@ -254,10 +249,8 @@ public static class ExcelSerializer
         foreach (var row in rows)
         {
             writer.Write(_rowStart);
-            //writer.Advance(_rowStart.Length);
             serializer.Serialize(ref formatter, writer, row, options);
             writer.Write(_rowEnd);
-            //writer.Advance(_rowEnd.Length);
         }
     }
 
@@ -266,10 +259,8 @@ public static class ExcelSerializer
         foreach (var row in rows)
         {
             writer.Write(_rowStart);
-            //writer.Advance(_rowStart.Length);
             serializer.Serialize(ref formatter, writer, row, options);
             writer.Write(_rowEnd);
-            //writer.Advance(_rowEnd.Length);
         }
     }
 
@@ -294,7 +285,6 @@ public static class ExcelSerializer
 
         //var size = 100 * formatter.ColumnMaxLength.Count;
         writer.Write(_colStart);
-        //writer.Advance(_colStart.Length);
         foreach (var pair in formatter.ColumnMaxLength)
         {
             var id = pair.Key + 1;

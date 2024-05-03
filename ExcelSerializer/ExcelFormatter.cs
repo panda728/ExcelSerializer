@@ -112,7 +112,6 @@ public sealed class ExcelFormatter
         _columnIndex++;
     }
 
-
     //    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     //    void WriteRaw(string s, IBufferWriter<byte> writer)
     //    {
@@ -143,29 +142,14 @@ public sealed class ExcelFormatter
             return;
         }
 
+        var index = SharedStrings.TryAdd(s, _stringIndex)
+            ? _stringIndex++
+            : SharedStrings[s];
+
         var span = s.Contains(Environment.NewLine) ? _colStartStringWrap.AsSpan() : _colStartString.AsSpan();
         writer.Write(span);
-        //writer.Advance(span.Length);
-
-#if NETSTANDARD2_1_OR_GREATER
-        var index = SharedStrings.TryAdd(value, _stringIndex)
-            ? _stringIndex++
-            : SharedStrings[value];
-#else
-        var index = 0;
-        if (SharedStrings.TryGetValue(s, out int value))
-        {
-            index = value;
-        }
-        else
-        {
-            SharedStrings.Add(s, _stringIndex);
-            index = _stringIndex++;
-        }
-#endif
         WriteRaw($"{index}".AsSpan(), writer);
         writer.Write(_colEnd);
-        //writer.Advance(_colEnd.Length);
         SetMaxLength(s.Length);
     }
 
@@ -177,12 +161,7 @@ public sealed class ExcelFormatter
         var buffer = toReturn.AsSpan();
         Encoding.UTF8.TryGetBytes(chars, toReturn, out var written);
         writer.Write(buffer[..written]);
-        //writer.Advance(written);
         ArrayPool<byte>.Shared.Return(toReturn);
-#elif NET5_0_OR_GREATER
-        var bytes = Encoding.UTF8.GetBytes(chars);
-        writer.Write(bytes);
-        //writer.Advance(bytes.Length);
 #else
         var bytes = Encoding.UTF8.GetBytes(chars.ToArray());
         writer.Write(bytes);
@@ -197,12 +176,9 @@ public sealed class ExcelFormatter
     public void WritePrimitive(bool value, IBufferWriter<byte> writer)
     {
         writer.Write(_colStartBoolean);
-        //writer.Advance(_colStartBoolean.Length);
         var span = value ? _boolTrue.AsSpan() : _boolFalse.AsSpan();
         writer.Write(span);
-        //writer.Advance(span.Length);
         writer.Write(_colEnd);
-        //writer.Advance(_colEnd.Length);
         SetMaxLength(1);
     }
 
@@ -210,10 +186,8 @@ public sealed class ExcelFormatter
     void WriterInteger(in ReadOnlySpan<char> chars, IBufferWriter<byte> writer)
     {
         writer.Write(_colStartInteger);
-        //writer.Advance(_colStartInteger.Length);
         WriteRaw(chars, writer);
         writer.Write(_colEnd);
-        //writer.Advance(_colEnd.Length);
         SetMaxLength(chars.Length);
     }
 
@@ -221,11 +195,25 @@ public sealed class ExcelFormatter
     void WriterNumber(in ReadOnlySpan<char> chars, IBufferWriter<byte> writer)
     {
         writer.Write(_colStartNumber);
-        //writer.Advance(_colStartNumber.Length);
         WriteRaw(chars, writer);
         writer.Write(_colEnd);
-        //writer.Advance(_colEnd.Length);
         SetMaxLength(chars.Length);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void WriteDateTime(DateTime value, IBufferWriter<byte> writer)
+    {
+        var d = value;
+        if (d == DateTime.MinValue) WriteEmpty(writer);
+        if (d.Hour == 0 && d.Minute == 0 && d.Second == 0)
+        {
+            WriteRaw(@$"<c t=""d"" s=""{XF_DATE}""><v>{d:yyyy-MM-ddTHH:mm:ss}</v></c>".AsSpan(), writer);
+            SetMaxLength(LEN_DATE);
+            return;
+        }
+
+        WriteRaw(@$"<c t=""d"" s=""{XF_DATETIME}""><v>{d:yyyy-MM-ddTHH:mm:ss}</v></c>".AsSpan(), writer);
+        SetMaxLength(LEN_DATETIME);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -251,21 +239,10 @@ public sealed class ExcelFormatter
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WritePrimitive(ushort value, IBufferWriter<byte> writer) => WriterNumber($"{value}".AsSpan(), writer);
 
+#if NET5_0_OR_GREATER
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void WriteDateTime(DateTime value, IBufferWriter<byte> writer)
-    {
-        var d = value;
-        if (d == DateTime.MinValue) WriteEmpty(writer);
-        if (d.Hour == 0 && d.Minute == 0 && d.Second == 0)
-        {
-            WriteRaw(@$"<c t=""d"" s=""{XF_DATE}""><v>{d:yyyy-MM-ddTHH:mm:ss}</v></c>".AsSpan(), writer);
-            SetMaxLength(LEN_DATE);
-            return;
-        }
-
-        WriteRaw(@$"<c t=""d"" s=""{XF_DATETIME}""><v>{d:yyyy-MM-ddTHH:mm:ss}</v></c>".AsSpan(), writer);
-        SetMaxLength(LEN_DATETIME);
-    }
+    public void WritePrimitive(Half value, IBufferWriter<byte> writer) => WriterNumber($"{value}".AsSpan(), writer);
+#endif
 
 #if NET6_0_OR_GREATER
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -281,6 +258,13 @@ public sealed class ExcelFormatter
         WriteRaw(@$"<c t=""d"" s=""{XF_TIME}""><v>1900-01-01T{value:HH:mm:ss}</v></c>".AsSpan(), writer);
         SetMaxLength(LEN_TIME);
     }
+#endif
+
+#if NET7_0_OR_GREATER
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void WritePrimitive(Int128 value, IBufferWriter<byte> writer) => WriterNumber($"{value}".AsSpan(), writer);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void WritePrimitive(UInt128 value, IBufferWriter<byte> writer) => WriterNumber($"{value}".AsSpan(), writer);
 #endif
 
 #if NETSTANDARD2_1_OR_GREATER
