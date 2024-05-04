@@ -18,7 +18,7 @@ namespace BenchmarkSample
         static readonly string workPath = Path.Combine(Path.GetDirectoryName(exePath) ?? "", "work");
         readonly string excelAppFileName = Path.Combine(workPath, $"excelapp-{Guid.NewGuid()}.xlsx");
         readonly string closedXmlFileName = Path.Combine(workPath, $"closedxml-{Guid.NewGuid()}.xlsx");
-        readonly string fakeExcelFileName = Path.Combine(workPath, $"FakeExcel-{Guid.NewGuid()}.xlsx");
+        readonly string excelSerializerFileName = Path.Combine(workPath, $"ExcelSerializer-{Guid.NewGuid()}.xlsx");
         const int CALCULATION_DEFAULT = 1;
 
         public ExportExcel()
@@ -43,8 +43,8 @@ namespace BenchmarkSample
             if (File.Exists(closedXmlFileName))
                 File.Delete(closedXmlFileName);
 
-            if (File.Exists(fakeExcelFileName))
-                File.Delete(fakeExcelFileName);
+            if (File.Exists(excelSerializerFileName))
+                File.Delete(excelSerializerFileName);
         }
 
         [GlobalSetup]
@@ -245,16 +245,16 @@ namespace BenchmarkSample
         }
         #endregion
 
-        #region FakeExcelSerializer
+        #region ExcelSerializer
         [Benchmark]
-        public void FakeExcelSerializer()
+        public void RunExcelSerializer()
         {
             var customOptions = ExcelSerializerOptions.Default with
             {
                 HeaderTitles = ["行番号", "ヘッダID", "明細ID", "明細データ", "ヘッダ1", "ヘッダ2", "ヘッダ3", "ヘッダ4", "ヘッダ5", "ヘッダ6", "ヘッダ7", "フッタ1", "フッタ2", "フッタ3", "フッタ4", "フッタ5", "フッタ6", "フッタ7", "フッタ8"],
                 HasHeaderRecord = true,
             };
-            ExcelSerializer.ToFile(rows, fakeExcelFileName, customOptions);
+            ExcelSerializer.ToFile(rows, excelSerializerFileName, customOptions);
         }
         #endregion
     }

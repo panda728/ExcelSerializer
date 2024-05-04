@@ -29,7 +29,7 @@ sw.Stop();
 Console.WriteLine($"ClosedXml : {sw.ElapsedMilliseconds:#,##0}ms");
 
 sw.Restart();
-ex.FakeExcelSerializer();
+ex.ExcelSerializer();
 Console.WriteLine($"ExcelSerializer : {sw.ElapsedMilliseconds:#,##0}ms");
 sw.Stop();
 
