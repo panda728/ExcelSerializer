@@ -2,7 +2,7 @@
 Convert object to Excel file (.xlsx) [Open XML SpreadsheetML File Format]
 
 ## Getting Started
-Supporting platform is .NET Standard 2.0, 2.1, .NET 5, .NET 6., .NET 8.
+Supporting platform is .NET Standard 2.0, 2.1, .NET 6., .NET 8.
 
 ## Usage
 You can use `ExcelSerializer.ToFile` to create .xlsx file.
@@ -16,18 +16,16 @@ ExcelSerializer.ToFile(Users, "test.xlsx", ExcelSerializerOptions.Default);
 Folder creation permissions are required since a working folder will be used.
 
 ## Benchmark
-N = 100 lines.
-
-| Method              | N   | Mean        | Error      | StdDev    | Ratio | RatioSD | Gen0        | Gen1       | Gen2      | Allocated    | Alloc Ratio |
-|-------------------- |---- |------------:|-----------:|----------:|------:|--------:|------------:|-----------:|----------:|-------------:|------------:|
-| ClosedXml           | 1   |    59.84 ms | 130.093 ms |  7.131 ms |  1.00 |    0.00 |   1666.6667 |          - |         - |   8076.14 KB |        1.00 |
-| FakeExcelSerializer | 1   |    19.86 ms |   2.429 ms |  0.133 ms |  0.34 |    0.04 |           - |          - |         - |    125.19 KB |        0.02 |
-|                     |     |             |            |           |       |         |             |            |           |              |             |
-| ClosedXml           | 10  |   404.73 ms | 265.054 ms | 14.528 ms |  1.00 |    0.00 |  16000.0000 |  1000.0000 |         - |  76114.77 KB |       1.000 |
-| FakeExcelSerializer | 10  |    32.11 ms | 136.936 ms |  7.506 ms |  0.08 |    0.02 |    156.2500 |          - |         - |    659.63 KB |       0.009 |
-|                     |     |             |            |           |       |         |             |            |           |              |             |
-| ClosedXml           | 100 | 3,821.12 ms | 362.274 ms | 19.857 ms |  1.00 |    0.00 | 149000.0000 | 11000.0000 | 2000.0000 | 748791.17 KB |       1.000 |
-| FakeExcelSerializer | 100 |    75.68 ms |  12.662 ms |  0.694 ms |  0.02 |    0.00 |   1333.3333 |          - |         - |    6004.6 KB |       0.008 |
+| Method             | N   | Mean        | Error      | StdDev   | Ratio | RatioSD | Gen0        | Gen1       | Gen2      | Allocated    | Alloc Ratio |
+|------------------- |---- |------------:|-----------:|---------:|------:|--------:|------------:|-----------:|----------:|-------------:|------------:|
+| ClosedXml          | 1   |    46.41 ms |  54.183 ms | 2.970 ms |  1.00 |    0.00 |   1750.0000 |   500.0000 |         - |   8077.43 KB |        1.00 |
+| RunExcelSerializer | 1   |    21.74 ms | 101.723 ms | 5.576 ms |  0.47 |    0.12 |           - |          - |         - |    126.79 KB |        0.02 |
+|                    |     |             |            |          |       |         |             |            |           |              |             |
+| ClosedXml          | 10  |   376.59 ms | 179.068 ms | 9.815 ms |  1.00 |    0.00 |  16000.0000 |  1000.0000 |         - |  76120.38 KB |       1.000 |
+| RunExcelSerializer | 10  |    27.04 ms |   4.965 ms | 0.272 ms |  0.07 |    0.00 |    142.8571 |          - |         - |    672.77 KB |       0.009 |
+|                    |     |             |            |          |       |         |             |            |           |              |             |
+| ClosedXml          | 100 | 3,529.88 ms | 125.574 ms | 6.883 ms |  1.00 |    0.00 | 149000.0000 | 11000.0000 | 2000.0000 | 748783.16 KB |        1.00 |
+| RunExcelSerializer | 100 |    87.16 ms |  93.944 ms | 5.149 ms |  0.02 |    0.00 |   1500.0000 |   833.3333 |         - |   9527.74 KB |        0.01 |
 
 ## Example-1
 If you pass an object, it will be converted to an Excel file.  
